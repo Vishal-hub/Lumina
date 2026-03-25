@@ -991,23 +991,21 @@
       if (!state.faceFilter) return c;
       const filteredItems = c.items.filter(it => {
         const lowerTags = (it.aiTags || "").toLowerCase();
-        const hasPerson = (it.personNames && it.personNames.trim().length > 0) || lowerTags.includes('person');
 
-        // Exclude if it looks like a false positive (car/nature identified as primary)
-        // unless a real person name is recognized.
-        const isFalsePositive = !it.personNames && (
-          lowerTags.includes('car') ||
-          lowerTags.includes('boat') ||
-          lowerTags.includes('bird') ||
-          lowerTags.includes('tree') ||
-          lowerTags.includes('nature') ||
-          lowerTags.includes('landscape') ||
-          lowerTags.includes('vehicle') ||
-          lowerTags.includes('automobile')
-        );
+        // Hierarchy of human indicators
+        const hasIdentity = it.personNames && it.personNames.trim().length > 0;
+        const humanTerms = ['person', 'man', 'woman', 'human', 'face', 'portrait', 'lady', 'gentleman', 'boy', 'girl', 'child', 'adult', 'people', 'smile', 'selfie'];
+        const hasHumanTerm = humanTerms.some(k => lowerTags.includes(k));
 
-        if (state.faceFilter === 'portrait') return it.faceCount === 1 && hasPerson && !isFalsePositive;
-        if (state.faceFilter === 'group') return it.faceCount >= 2 && hasPerson && !isFalsePositive;
+        // Scalable clash detection (exclude if non-human categories dominate)
+        const clashTerms = ['car', 'boat', 'vehicle', 'automobile', 'nature', 'landscape', 'tree', 'flower', 'building', 'scenery', 'architecture', 'bird', 'animal', 'robot', 'statue', 'toy', 'watercraft'];
+        const hasClash = !hasIdentity && clashTerms.some(k => lowerTags.includes(k));
+
+        const hasPerson = hasIdentity || hasHumanTerm || lowerTags.includes('person');
+        const isVerifiedPerson = hasPerson && !hasClash;
+
+        if (state.faceFilter === 'portrait') return it.faceCount === 1 && isVerifiedPerson;
+        if (state.faceFilter === 'group') return it.faceCount >= 2 && isVerifiedPerson;
         return true;
       });
       return { ...c, items: filteredItems };
