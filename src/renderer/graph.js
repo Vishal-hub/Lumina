@@ -1,7 +1,60 @@
 import { GRAPH, state, ui } from './state.js';
-import { toFileSrc, formatDate, nodeCountLabel } from './utils.js';
+import { toFileSrc, formatDate, nodeCountLabel, getDisplayPath, getFullSizePath } from './utils.js';
 import { showLightbox } from './lightbox.js';
 import { updateMapMarkers, setMapVisibility } from './map.js';
+
+function seededRandom(seed) {
+    let s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+}
+
+function pulseY(t) {
+    const TWO_PI = Math.PI * 2;
+    return Math.sin(t * TWO_PI) * 0.55
+        + Math.sin(t * TWO_PI * 2 + 0.8) * 0.30
+        + Math.sin(t * TWO_PI * 3 + 2.0) * 0.15;
+}
+
+function computeAllPositions(count) {
+    const vpH = ui.viewport ? ui.viewport.clientHeight : 600;
+    const canvasH = Math.max(vpH - 80, 520);
+    GRAPH.height = canvasH;
+
+    const padY = 60;
+    const padX = 100;
+    const midY = canvasH / 2;
+    const amplitude = (canvasH / 2) - padY - GRAPH.nodeHeight / 2;
+
+    const totalW = Math.max(1200, (count + 1) * GRAPH.gapX + 300);
+    GRAPH.width = totalW;
+
+    const cycleLen = Math.max(3.5, count * 0.45);
+    const placed = [];
+
+    for (let i = 0; i < count; i++) {
+        const r3 = seededRandom(i * 3571 + 53);
+
+        const x = padX + i * GRAPH.gapX;
+        const t = i / Math.max(1, count - 1) * cycleLen;
+        const beat = pulseY(t);
+        const y = midY - beat * amplitude - GRAPH.nodeHeight / 2;
+
+        const scale = 0.94 + Math.abs(beat) * 0.12 + r3 * 0.04;
+        placed.push({ x, y, scale });
+    }
+
+    return placed;
+}
+
+function computeNodePosition(i, count) {
+    if (!computeNodePosition._cache || computeNodePosition._cacheCount !== count) {
+        computeNodePosition._cache = computeAllPositions(count);
+        computeNodePosition._cacheCount = count;
+    }
+    return computeNodePosition._cache[i] || { x: 0, y: 0, scale: 1 };
+}
 
 export function setTransform() {
     if (state.inDetailsView) {
@@ -30,6 +83,7 @@ export function resetViewportContext() {
     state.inDetailsView = false;
     state.openedFromMap = false;
     state.openedFromPeople = false;
+    state.openedFromTree = false;
     if (ui.viewport) {
         ui.viewport.classList.remove('scrollable-mode');
         ui.viewport.style.overflow = 'hidden';
@@ -50,20 +104,18 @@ function updateMorphedLayout(morphFactor) {
     const circleRadius = Math.min(GRAPH.height / 2 - 80, Math.max(250, count * 18));
 
     const morphedPositions = state.lastPositions.map((pos, i) => {
-        const waveX = GRAPH.startX + i * GRAPH.gapX;
-        const lane = Math.abs((i % 4) - 2);
-        const waveY = GRAPH.startY + lane * GRAPH.laneGap;
+        const base = computeNodePosition(i, count);
 
         const angle = (i / count) * Math.PI * 2;
         const circleX = centerX + circleRadius * Math.cos(angle);
         const circleY = centerY + circleRadius * Math.sin(angle);
 
-        let x = waveX;
-        let y = waveY;
+        let x = base.x;
+        let y = base.y;
 
         if (morphFactor > 0) {
-            x = waveX * (1 - morphFactor) + circleX * morphFactor;
-            y = waveY * (1 - morphFactor) + circleY * morphFactor;
+            x = base.x * (1 - morphFactor) + circleX * morphFactor;
+            y = base.y * (1 - morphFactor) + circleY * morphFactor;
         }
 
         const el = state.clusterElements.get(pos.id);
@@ -79,52 +131,68 @@ function updateMorphedLayout(morphFactor) {
 }
 
 export function redrawConnections(positions, morphFactor = 0) {
+    const defs = ui.connections.querySelector('defs');
     if (!positions || positions.length < 2) {
         ui.connections.innerHTML = '';
+        if (defs) ui.connections.appendChild(defs);
         return;
     }
 
     ui.connections.innerHTML = '';
+    if (defs) ui.connections.appendChild(defs);
+
+    if (morphFactor >= 0.8) return;
+
     const fragment = document.createDocumentFragment();
+    const fade = Math.max(0, 1 - morphFactor * 1.5);
+
+    const nodeRects = positions.map(pos => {
+        const el = state.clusterElements.get(pos.id);
+        const w = el ? el.offsetWidth : GRAPH.nodeWidth;
+        const h = el ? el.offsetHeight : GRAPH.nodeHeight;
+        return { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 };
+    });
 
     for (let i = 0; i < positions.length - 1; i++) {
-        const pos = positions[i];
-        const next = positions[i + 1];
+        const a = nodeRects[i];
+        const b = nodeRects[i + 1];
 
-        const el = state.clusterElements.get(pos.id);
-        const nextEl = state.clusterElements.get(next.id);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', a.x + a.w);
+        line.setAttribute('y1', a.cy);
+        line.setAttribute('x2', b.x);
+        line.setAttribute('y2', b.cy);
+        line.setAttribute('class', 'constellation-line');
+        line.style.opacity = fade * 0.45;
+        fragment.appendChild(line);
+    }
 
-        const startWidth = el ? el.offsetWidth : GRAPH.nodeWidth;
-        const startHeight = el ? el.offsetHeight : GRAPH.nodeHeight;
-        const endHeight = nextEl ? nextEl.offsetHeight : GRAPH.nodeHeight;
+    const starCount = Math.max(40, Math.round(GRAPH.width * GRAPH.height / 12000));
+    for (let s = 0; s < starCount; s++) {
+        const sx = seededRandom(s * 7919 + 11) * GRAPH.width;
+        const sy = seededRandom(s * 6271 + 37) * GRAPH.height;
 
-        const startX = pos.x + startWidth;
-        const startY = pos.y + startHeight / 2;
-        const endX = next.x;
-        const endY = next.y + endHeight / 2;
+        let blocked = false;
+        for (const r of nodeRects) {
+            if (sx > r.x - 10 && sx < r.x + r.w + 10 && sy > r.y - 10 && sy < r.y + r.h + 10) {
+                blocked = true;
+                break;
+            }
+        }
+        if (blocked) continue;
 
-        const curveIntensity = 1 - Math.min(1, morphFactor * 1.2);
-        const cpDistance = Math.max(0, (endX - startX) * 0.8 * curveIntensity);
+        const r3 = seededRandom(s * 3571 + 53);
+        const size = 0.6 + r3 * 2;
+        const bright = r3 > 0.8;
 
-        const cp1X = startX + cpDistance;
-        const cp1Y = startY;
-        const cp2X = endX - cpDistance;
-        const cp2Y = endY;
-
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const d = `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
-        path.setAttribute('d', d);
-
-        const staggerDelay = i * 0.015;
-        const segmentOpacity = Math.max(0, 1 - (morphFactor * 3.5 + staggerDelay));
-        path.style.opacity = segmentOpacity;
-
-        const dashBase = 8;
-        const dashGap = 8 + morphFactor * 40;
-        path.style.strokeDasharray = `${dashBase} ${dashGap}`;
-        path.style.strokeWidth = Math.max(3, 4 / state.scale);
-
-        fragment.appendChild(path);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', sx);
+        dot.setAttribute('cy', sy);
+        dot.setAttribute('r', size);
+        dot.setAttribute('class', bright ? 'star-dot star-dot-bright' : 'star-dot');
+        dot.style.animationDelay = `${seededRandom(s * 4919 + 71) * -8}s`;
+        dot.style.opacity = fade;
+        fragment.appendChild(dot);
     }
 
     ui.connections.appendChild(fragment);
@@ -147,15 +215,14 @@ export function centerOnPositions(positions) {
     state.idealScale = 1;
 
     positions.forEach((pos, i) => {
-        const waveX = GRAPH.startX + i * GRAPH.gapX;
-        const lane = Math.abs((i % 4) - 2);
-        const waveY = GRAPH.startY + lane * GRAPH.laneGap;
-        pos.x = waveX;
-        pos.y = waveY;
+        const p = computeNodePosition(i, positions.length);
+        pos.x = p.x;
+        pos.y = p.y;
         const el = state.clusterElements.get(pos.id);
         if (el) {
-            el.style.left = `${waveX}px`;
-            el.style.top = `${waveY}px`;
+            el.style.left = `${p.x}px`;
+            el.style.top = `${p.y}px`;
+            el.style.setProperty('--node-scale', p.scale);
         }
     });
 
@@ -199,15 +266,17 @@ function getRelatedClusters(currentEventId) {
     return related;
 }
 
+let _renderGen = 0;
+
 export function renderClusters(clusters, options = {}) {
+    const gen = ++_renderGen;
     state.filteredClusters = clusters;
     setGraphTransformEnabled(true);
     ui.gallery.innerHTML = '';
 
-    const totalWidth = Math.max(1200, (clusters.length + 1) * GRAPH.gapX + 300);
-    const totalHeight = 800;
-    GRAPH.width = totalWidth;
-    GRAPH.height = totalHeight;
+    computeNodePosition._cache = null;
+    computeNodePosition._cacheCount = 0;
+    computeNodePosition(0, clusters.length);
 
     ui.gallery.style.width = `${GRAPH.width}px`;
     ui.gallery.style.height = `${GRAPH.height}px`;
@@ -217,23 +286,60 @@ export function renderClusters(clusters, options = {}) {
     ui.connections.setAttribute('height', GRAPH.height);
     ui.connections.setAttribute('viewBox', `0 0 ${GRAPH.width} ${GRAPH.height}`);
 
+    if (!ui.connections.querySelector('#connGrad')) {
+        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        grad.id = 'connGrad';
+        grad.setAttribute('gradientUnits', 'userSpaceOnUse');
+        grad.setAttribute('x1', '0');
+        grad.setAttribute('y1', '0');
+        grad.setAttribute('x2', String(GRAPH.width));
+        grad.setAttribute('y2', '0');
+        const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop1.setAttribute('offset', '0%');
+        stop1.setAttribute('stop-color', '#a78bfa');
+        stop1.setAttribute('stop-opacity', '0.6');
+        const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop2.setAttribute('offset', '50%');
+        stop2.setAttribute('stop-color', '#818cf8');
+        stop2.setAttribute('stop-opacity', '0.45');
+        const stop3 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop3.setAttribute('offset', '100%');
+        stop3.setAttribute('stop-color', '#38bdf8');
+        stop3.setAttribute('stop-opacity', '0.6');
+        grad.appendChild(stop1);
+        grad.appendChild(stop2);
+        grad.appendChild(stop3);
+        defs.appendChild(grad);
+        ui.connections.appendChild(defs);
+    } else {
+        const grad = ui.connections.querySelector('#connGrad');
+        grad.setAttribute('x2', String(GRAPH.width));
+    }
+
     const positions = [];
     state.clusterElements.clear();
 
     clusters.forEach((cluster, index) => {
+        if (!cluster.items || cluster.items.length === 0) return;
+
         const div = document.createElement('div');
         div.className = 'cluster';
         div.setAttribute('role', 'button');
         div.setAttribute('tabindex', '0');
         div.setAttribute('aria-label', `${cluster.placeName || cluster.label || ''} — ${nodeCountLabel(cluster)}`);
 
-        const x = GRAPH.startX + index * GRAPH.gapX;
-        const lane = Math.abs((index % 4) - 2);
-        const y = GRAPH.startY + lane * GRAPH.laneGap;
+        const pos = computeNodePosition(index, clusters.length);
 
-        positions.push({ id: cluster.id, x, y });
-        div.style.left = `${x}px`;
-        div.style.top = `${y}px`;
+        positions.push({ id: cluster.id, x: pos.x, y: pos.y });
+        div.style.left = `${pos.x}px`;
+        div.style.top = `${pos.y}px`;
+        div.style.setProperty('--node-scale', pos.scale);
+
+        const perNode = 0.55;
+        const cycleDur = Math.max(5, clusters.length * perNode + 2);
+        div.style.setProperty('--wave-total', `${cycleDur.toFixed(2)}s`);
+        div.style.setProperty('--wave-delay', `${(index * perNode).toFixed(2)}s`);
 
         div.addEventListener('dblclick', (e) => {
             e.stopPropagation();
@@ -266,24 +372,40 @@ export function renderClusters(clusters, options = {}) {
             ui.viewport.classList.add('dragging');
         });
 
+        const ring = document.createElement('div');
+        ring.className = 'img-ring';
+
+        const displayPath = getDisplayPath(cluster.items[0]);
+        const hasThumbnail = Boolean(displayPath);
+
+        if (!hasThumbnail) {
+            ring.classList.add('shimmer');
+        }
+
         if (cluster.items[0].type === 'video') {
             const video = document.createElement('video');
             video.src = toFileSrc(cluster.items[0].path);
-            video.width = 96;
-            video.height = 96;
+            video.width = 108;
+            video.height = 108;
             video.muted = true;
             video.autoplay = true;
             video.loop = true;
             video.playsInline = true;
-            div.appendChild(video);
+            ring.appendChild(video);
         } else {
             const img = document.createElement('img');
-            const displaySrc = cluster.items[0].thumbnailPath || cluster.items[0].path;
-            img.src = toFileSrc(displaySrc);
+            if (hasThumbnail) {
+                img.src = toFileSrc(displayPath);
+            }
             img.loading = 'lazy';
-            img.onload = () => redrawConnections(state.lastPositions);
-            div.appendChild(img);
+            img.onload = () => {
+                ring.classList.remove('shimmer');
+                if (gen === _renderGen) redrawConnections(state.lastPositions);
+            };
+            img.onerror = () => { ring.classList.add('shimmer'); };
+            ring.appendChild(img);
         }
+        div.appendChild(ring);
 
         const count = document.createElement('div');
         count.className = 'count';
@@ -345,8 +467,9 @@ export function openCluster(eventId) {
 
     const cameFromMap = state.openedFromMap;
     const cameFromPeople = state.openedFromPeople;
-    const backDest = cameFromMap ? 'map' : cameFromPeople ? 'people' : 'timeline';
-    const backLabel = cameFromMap ? 'Back to Map' : cameFromPeople ? 'Back to Identities' : 'Back to Timeline';
+    const cameFromTree = state.openedFromTree;
+    const backDest = cameFromMap ? 'map' : cameFromTree ? 'tree' : cameFromPeople ? 'people' : 'timeline';
+    const backLabel = cameFromMap ? 'Back to Map' : cameFromTree ? 'Back to Family Tree' : cameFromPeople ? 'Back to Identities' : 'Back to Timeline';
 
     const back = document.createElement('div');
     back.className = 'nav-item back-nav';
@@ -368,20 +491,21 @@ export function openCluster(eventId) {
     if (cluster.placeName) {
         const chip = document.createElement('div');
         chip.className = 'place-chip';
-        chip.innerText = `🌍 ${cluster.placeName}`;
+        chip.innerText = `● ${cluster.placeName}`;
         wrapper.appendChild(chip);
     }
 
     if (cluster.items[0].aiTags) {
-        const tagContainer = document.createElement('div');
+        const aiRow = document.createElement('div');
+        aiRow.className = 'detail-tags-row';
         const tags = cluster.items[0].aiTags.split(',');
         tags.forEach(tag => {
             const tagEl = document.createElement('div');
             tagEl.className = 'ai-tag';
             tagEl.innerText = `✨ ${tag.trim()}`;
-            tagContainer.appendChild(tagEl);
+            aiRow.appendChild(tagEl);
         });
-        wrapper.appendChild(tagContainer);
+        wrapper.appendChild(aiRow);
     }
 
     const grid = document.createElement('div');
@@ -395,7 +519,7 @@ export function openCluster(eventId) {
             grid.appendChild(video);
         } else {
             const img = document.createElement('img');
-            img.src = toFileSrc(item.path);
+            img.src = toFileSrc(getFullSizePath(item));
             img.loading = 'lazy';
             img.setAttribute('tabindex', '0');
             img.setAttribute('role', 'button');
@@ -457,7 +581,9 @@ export function openCluster(eventId) {
 export function updateNavActiveState() {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
 
-    if (state.showMap || (state.inDetailsView && state.openedFromMap)) {
+    if (state.treeViewActive || state.openedFromTree) {
+        ui.navFamilyTree.classList.add('active');
+    } else if (state.showMap || (state.inDetailsView && state.openedFromMap)) {
         ui.navMap.classList.add('active');
     } else if ((state.groupBy === 'person' && state.inDetailsView) || state.openedFromPeople) {
         ui.navPeople.classList.add('active');
@@ -472,16 +598,30 @@ export function updateNavActiveState() {
     }
 }
 
+export async function focusPersonCluster(personId, switchGroupByFn, { source, beforeFn } = {}) {
+    if (typeof beforeFn === 'function') beforeFn();
+    state.inDetailsView = false;
+    setMapVisibility(false, { skipRender: true });
+    await switchGroupByFn('person');
+    state.personFilter = personId;
+    const { applyFilters } = await import('./search.js');
+    applyFilters();
+    if (source === 'tree') state.openedFromTree = true;
+    else if (source === 'people') state.openedFromPeople = true;
+    openCluster(`person-${personId}`);
+}
+
 export async function handleBackNavigation() {
     if (!state.inDetailsView) return;
 
     const backBtn = document.querySelector('.back-nav');
     const action = backBtn ? backBtn.getAttribute('data-back-action') :
-        (state.openedFromMap ? 'map' : (state.openedFromPeople ? 'people' : 'timeline'));
+        (state.openedFromMap ? 'map' : (state.openedFromTree ? 'tree' : (state.openedFromPeople ? 'people' : 'timeline')));
 
-    console.log('[Nav] Back navigation triggered, action=', action);
-
-    if (action === 'people') {
+    if (action === 'tree') {
+        resetViewportContext();
+        ui.navFamilyTree.click();
+    } else if (action === 'people') {
         resetViewportContext();
         ui.navPeople.click();
     } else if (action === 'map') {

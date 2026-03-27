@@ -2,7 +2,6 @@ import { ui } from './state.js';
 
 const PHASES = ['scan', 'metadata', 'ai', 'faces', 'vectors'];
 
-let currentPhase = null;
 let dismissed = false;
 
 export function setLoadingSubtitle(text) {
@@ -21,7 +20,6 @@ export function setLoadingProgress(percent) {
 
 export function setLoadingPhase(phase) {
     if (!ui.loadingPhases || dismissed) return;
-    currentPhase = phase;
 
     const phaseIndex = PHASES.indexOf(phase);
     const items = ui.loadingPhases.querySelectorAll('.loading-phase');
@@ -67,7 +65,6 @@ export function isLoadingVisible() {
 
 export function resetLoading() {
     dismissed = false;
-    currentPhase = null;
     if (ui.loadingScreen) {
         ui.loadingScreen.classList.remove('hidden');
     }

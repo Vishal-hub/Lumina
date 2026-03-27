@@ -1,5 +1,10 @@
 import { state, ui } from './state.js';
-import { openCluster, renderClusters, updateNavActiveState } from './graph.js';
+
+let _graphCallbacks = { openCluster: null, renderClusters: null, updateNavActiveState: null };
+
+export function registerGraphCallbacks(callbacks) {
+    Object.assign(_graphCallbacks, callbacks);
+}
 
 const MAP_WORLD_BOUNDS = [[-85, -180], [85, 180]];
 const MAP_MIN_ZOOM = 2;
@@ -43,25 +48,31 @@ export function setMapStyle(styleKey = 'voyager') {
     state.currentMapStyle = styleKey;
     if (ui.mapStyleSelect) {
         const trigger = ui.mapStyleSelect.querySelector('.dropdown-trigger');
-        const label = trigger.querySelector('.dropdown-label');
-        const item = ui.mapStyleSelect.querySelector(`.dropdown-item[data-value="${styleKey}"]`);
-        if (item) {
-            ui.mapStyleSelect.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
-            item.classList.add('active');
-            label.innerText = item.innerText;
+        if (trigger) {
+            const label = trigger.querySelector('.dropdown-label');
+            const item = ui.mapStyleSelect.querySelector(`.dropdown-item[data-value="${styleKey}"]`);
+            if (item) {
+                ui.mapStyleSelect.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                if (label) label.innerText = item.innerText;
+            }
         }
     }
+}
+
+function getClusterLatLon(cluster) {
+    const fallback = cluster.items?.find((it) => typeof it.latitude === 'number' && typeof it.longitude === 'number');
+    const lat = typeof cluster.centerLat === 'number' ? cluster.centerLat : fallback?.latitude;
+    const lon = typeof cluster.centerLon === 'number' ? cluster.centerLon : fallback?.longitude;
+    if (typeof lat === 'number' && typeof lon === 'number') return { lat, lon };
+    return null;
 }
 
 function getMapClusterBounds(clusters) {
     const bounds = [];
     clusters.forEach((cluster) => {
-        const fallback = cluster.items?.find((it) => typeof it.latitude === 'number' && typeof it.longitude === 'number');
-        const lat = typeof cluster.centerLat === 'number' ? cluster.centerLat : fallback?.latitude;
-        const lon = typeof cluster.centerLon === 'number' ? cluster.centerLon : fallback?.longitude;
-        if (typeof lat === 'number' && typeof lon === 'number') {
-            bounds.push([lat, lon]);
-        }
+        const pos = getClusterLatLon(cluster);
+        if (pos) bounds.push([pos.lat, pos.lon]);
     });
     return bounds;
 }
@@ -114,7 +125,7 @@ function focusClusterFromMap(clusterId) {
     state.openedFromMap = true;
     state.showMap = false;
     ui.mapPanel.classList.add('hidden');
-    openCluster(clusterId);
+    _graphCallbacks.openCluster(clusterId);
 }
 
 export { focusClusterFromMap };
@@ -124,7 +135,9 @@ function initMap() {
         state.map = L.map('map', {
             zoomControl: false,
             minZoom: MAP_MIN_ZOOM,
-            worldCopyJump: false,
+            worldCopyJump: true,
+            maxBoundsViscosity: 1.0,
+            maxBounds: [[-85, -Infinity], [85, Infinity]],
         }).setView([20, 0], MAP_MIN_ZOOM);
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles © Esri',
@@ -143,12 +156,12 @@ function initMap() {
         }, { capture: true, passive: false });
 
         state.map.on('dragstart', () => {
-            state.dragStartLng = state.map.getCenter().lng;
+            state.mapLockedLat = state.map.getCenter().lat;
         });
         state.map.on('drag', () => {
-            if (typeof state.dragStartLng === 'number') {
+            if (typeof state.mapLockedLat === 'number') {
                 const center = state.map.getCenter();
-                state.map.setView([center.lat, state.dragStartLng], state.map.getZoom(), { animate: false });
+                state.map.setView([state.mapLockedLat, center.lng], state.map.getZoom(), { animate: false });
             }
         });
         state.map.on('movestart', () => {
@@ -162,21 +175,21 @@ function initMap() {
 
 export { initMap };
 
-export function updateMapMarkers(clusters, { skipFitMap = false } = {}) {
-    if (!state.map) return;
-    state.mapMarkers.forEach((m) => state.map.removeLayer(m));
-    state.mapMarkers = [];
-    updateMapModeMeta(clusters);
+let _markerLayer = null;
 
-    const wrappedLongitudes = Array.from({ length: 13 }, (_, index) => (index - 6) * 360);
+function buildMarkers(clusters) {
+    if (!_markerLayer) {
+        _markerLayer = L.layerGroup().addTo(state.map);
+    }
+    _markerLayer.clearLayers();
+    state.mapMarkers = [];
     clusters.forEach((cluster) => {
-        const fallback = cluster.items?.find((it) => typeof it.latitude === 'number' && typeof it.longitude === 'number');
-        const lat = typeof cluster.centerLat === 'number' ? cluster.centerLat : fallback?.latitude;
-        const lon = typeof cluster.centerLon === 'number' ? cluster.centerLon : fallback?.longitude;
-        if (typeof lat === 'number' && typeof lon === 'number') {
-            const formattedDate = new Date(cluster.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const itemCount = cluster.items.length;
-            const popupHtml = `
+        const pos = getClusterLatLon(cluster);
+        if (!pos) return;
+        const { lat, lon } = pos;
+        const formattedDate = new Date(cluster.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const itemCount = cluster.items.length;
+        const popupHtml = `
         <div class="map-popup" data-cluster-id="${cluster.id}">
           <div class="map-popup-place">${cluster.placeName || 'Unknown Place'}</div>
           <div class="map-popup-meta">
@@ -186,14 +199,16 @@ export function updateMapMarkers(clusters, { skipFitMap = false } = {}) {
           <button class="map-popup-link" type="button" data-cluster-id="${cluster.id}">Open Cluster →</button>
         </div>
       `;
-            wrappedLongitudes.forEach((offset) => {
-                const marker = L.marker([lat, lon + offset])
-                    .addTo(state.map)
-                    .bindPopup(popupHtml);
-                state.mapMarkers.push(marker);
-            });
-        }
+        const marker = L.marker([lat, lon]).bindPopup(popupHtml);
+        _markerLayer.addLayer(marker);
+        state.mapMarkers.push(marker);
     });
+}
+
+export function updateMapMarkers(clusters, { skipFitMap = false } = {}) {
+    if (!state.map) return;
+    updateMapModeMeta(clusters);
+    buildMarkers(clusters);
     if (!skipFitMap && !state.mapSearchLocked) fitMapToClusters(clusters);
 }
 
@@ -204,7 +219,7 @@ export function setMapVisibility(show, { skipRender = false } = {}) {
     state.showMap = show;
     ui.mapPanel.classList.toggle('hidden', !show);
     updateModeToolbar();
-    updateNavActiveState();
+    _graphCallbacks.updateNavActiveState();
     if (show) {
         state.mapSearchLocked = false;
         if (ui.fitMapBtn) ui.fitMapBtn.classList.add('hidden');
@@ -214,6 +229,6 @@ export function setMapVisibility(show, { skipRender = false } = {}) {
             updateMapMarkers(state.filteredClusters);
         }, 200);
     } else if (!skipRender) {
-        renderClusters(state.filteredClusters);
+        _graphCallbacks.renderClusters(state.filteredClusters);
     }
 }

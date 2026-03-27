@@ -1,4 +1,4 @@
-import { toFileSrc } from './utils.js';
+import { toFileSrc, getFullSizePath } from './utils.js';
 
 export function showLightbox(items, startIndex = 0) {
     if (!items || items.length === 0) return;
@@ -31,7 +31,7 @@ export function showLightbox(items, startIndex = 0) {
 
     function updateContent() {
         const item = items[currentIndex];
-        img.src = toFileSrc(item.path);
+        img.src = toFileSrc(getFullSizePath(item));
         img.alt = item.placeName || 'Photo preview';
         counter.innerText = `${currentIndex + 1} / ${items.length}`;
         prevBtn.style.display = items.length > 1 ? 'block' : 'none';

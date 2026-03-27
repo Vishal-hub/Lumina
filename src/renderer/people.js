@@ -1,8 +1,7 @@
 import { state, ui } from './state.js';
-import { toFileSrc } from './utils.js';
-import { setGraphTransformEnabled, openCluster, updateNavActiveState } from './graph.js';
+import { toFileSrc, showIndexingHint } from './utils.js';
+import { setGraphTransformEnabled, updateNavActiveState, focusPersonCluster } from './graph.js';
 import { setMapVisibility } from './map.js';
-import { applyFilters } from './search.js';
 
 function sortPeople(people, sortBy) {
     const sorted = [...people];
@@ -146,10 +145,15 @@ export async function openPeopleGallery(switchGroupByFn) {
     const title = document.createElement('h2');
     title.innerText = 'Recognized Identities';
     header.appendChild(title);
+
     wrapper.appendChild(header);
 
     const people = await window.api.invoke('get-people');
     state.people = people;
+
+    if (!state.indexingComplete.faces) {
+        showIndexingHint('Face recognition in progress — more people will appear soon');
+    }
 
     showPeopleToolbar();
     updatePeopleStats(people);
@@ -170,12 +174,8 @@ export function resortPeopleGallery(switchGroupByFn) {
 }
 
 export async function focusClusterFromPeople(personId, switchGroupByFn) {
-    state.inDetailsView = false;
-    hidePeopleToolbar();
-    setMapVisibility(false, { skipRender: true });
-    await switchGroupByFn('person');
-    state.personFilter = personId;
-    applyFilters();
-    state.openedFromPeople = true;
-    openCluster(`person-${personId}`);
+    await focusPersonCluster(personId, switchGroupByFn, {
+        source: 'people',
+        beforeFn: () => hidePeopleToolbar(),
+    });
 }

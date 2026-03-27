@@ -1,5 +1,5 @@
 import { state, ui } from './state.js';
-import { toFileSrc, renderEmptyState } from './utils.js';
+import { toFileSrc, renderEmptyState, getDisplayPath, showIndexingHint } from './utils.js';
 import { renderClusters, setGraphTransformEnabled, handleBackNavigation } from './graph.js';
 import { showLightbox } from './lightbox.js';
 
@@ -22,10 +22,13 @@ export function renderSearchResults(items) {
     const wrapper = document.createElement('div');
     wrapper.className = 'details';
 
-    const back = document.createElement('button');
-    back.className = 'back-btn';
-    back.innerText = '← Back to Graph';
-    back.onclick = async () => {
+    const back = document.createElement('div');
+    back.className = 'nav-item back-nav';
+    back.style.width = 'fit-content';
+    back.style.cursor = 'pointer';
+    back.innerHTML = `<i>←</i> <span>Back to Graph</span>`;
+    back.onclick = async (e) => {
+        e.stopPropagation();
         await handleBackNavigation();
     };
     wrapper.appendChild(back);
@@ -48,8 +51,7 @@ export function renderSearchResults(items) {
             grid.appendChild(video);
         } else {
             const img = document.createElement('img');
-            const displaySrc = item.thumbnailPath || item.path;
-            img.src = toFileSrc(displaySrc);
+            img.src = toFileSrc(getDisplayPath(item));
             img.loading = 'lazy';
             const imgIndex = imageItems.indexOf(item);
             img.onclick = () => showLightbox(imageItems, imgIndex);
@@ -62,7 +64,13 @@ export function renderSearchResults(items) {
 }
 
 export function applyFilters() {
-    if (state.inDetailsView && !state.searchQuery) return;
+    if (state.inDetailsView && !state.searchQuery) {
+        if (state.treeViewActive || state.openedFromPeople || state.openedFromTree || state.openedFromMap) {
+            return;
+        }
+        handleBackNavigation();
+        return;
+    }
 
     let baseClusters = state.allClusters.map(c => {
         if (state.personFilter && c.id !== `person-${state.personFilter}`) return null;
@@ -78,6 +86,9 @@ export function applyFilters() {
     }).filter(c => c && c.items.length > 0);
 
     if (state.searchQuery) {
+        if (!state.indexingComplete.vectors) {
+            showIndexingHint('Still indexing — search results will improve in a moment');
+        }
         const terms = state.searchQuery.toLowerCase().split(' ').filter(t => t.trim().length > 0);
         let matchingItems = [];
 
@@ -101,7 +112,13 @@ export function applyFilters() {
 
         if (matchingItems.length > 0 || (state.semanticMatches && state.semanticMatches.length > 0)) {
             const combined = [...matchingItems, ...(state.semanticMatches || [])];
-            const uniqueItems = Array.from(new Set(combined));
+            const seen = new Set();
+            const uniqueItems = combined.filter(it => {
+                const key = it.path || it.id;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
 
             ui.timeLabel.innerText = `${uniqueItems.length} matching items (${(state.semanticMatches || []).length} semantic)`;
             renderSearchResults(uniqueItems);
@@ -112,7 +129,7 @@ export function applyFilters() {
         return;
     }
 
-    const timelineVal = parseInt(ui.slider.value, 10);
+    const timelineVal = ui.slider ? parseInt(ui.slider.value, 10) : 100;
     const count = Math.ceil((timelineVal / 100) * baseClusters.length);
     let filtered = baseClusters.slice(0, count);
 
@@ -136,12 +153,18 @@ export function bindSearchListeners() {
     ui.filterPortraitBtn.addEventListener('click', () => {
         state.faceFilter = state.faceFilter === 'portrait' ? null : 'portrait';
         updateFilterUI();
+        if (state.faceFilter && (!state.indexingComplete.visual || !state.indexingComplete.faces)) {
+            showIndexingHint('Still analyzing photos — filter results will improve shortly');
+        }
         applyFilters();
     });
 
     ui.filterGroupBtn.addEventListener('click', () => {
         state.faceFilter = state.faceFilter === 'group' ? null : 'group';
         updateFilterUI();
+        if (state.faceFilter && (!state.indexingComplete.visual || !state.indexingComplete.faces)) {
+            showIndexingHint('Still analyzing photos — filter results will improve shortly');
+        }
         applyFilters();
     });
 }

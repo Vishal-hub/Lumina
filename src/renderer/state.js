@@ -38,7 +38,6 @@ export const state = {
     mapTileLayer: null,
     mapMarkers: [],
     mapLockedLat: null,
-    syncingMapLatitude: false,
     showMap: false,
     currentMapStyle: 'voyager',
     mapSearchLocked: false,
@@ -47,7 +46,19 @@ export const state = {
     peopleSortBy: 'photos',
     libraryDirty: false,
     navigationToken: 0,
-    dragStartLng: null,
+    treeData: null,
+    treeViewActive: false,
+    linkingPerson: null,
+    highlightedPath: [],
+    openedFromMap: false,
+    openedFromPeople: false,
+    openedFromTree: false,
+    mapFitting: false,
+    indexingComplete: {
+        visual: false,
+        faces: false,
+        vectors: false,
+    },
 };
 
 export const ui = {
@@ -85,6 +96,7 @@ export const ui = {
     peopleSortSelect: document.getElementById('peopleSortDropdown'),
     navTimeline: document.getElementById('navTimeline'),
     navPeople: document.getElementById('navPeople'),
+    navFamilyTree: document.getElementById('navFamilyTree'),
     navMap: document.getElementById('navMap'),
     renameModal: document.getElementById('renameModal'),
     renameInput: document.getElementById('renameInput'),
@@ -96,6 +108,19 @@ export const ui = {
     loadingProgressWrap: document.getElementById('loadingProgressWrap'),
     loadingProgressBar: document.getElementById('loadingProgressBar'),
     loadingDetail: document.getElementById('loadingDetail'),
+    relationshipModal: document.getElementById('relationshipModal'),
+    relTypeDropdown: document.getElementById('relTypeDropdown'),
+    relSaveBtn: document.getElementById('saveRelBtn'),
+    relCancelBtn: document.getElementById('cancelRelBtn'),
+    relCloseBtn: document.getElementById('closeRelModalBtn'),
+    relPersonA: document.getElementById('relPersonA'),
+    relPersonB: document.getElementById('relPersonB'),
+    treeModeWrap: document.getElementById('treeModeWrap'),
+    treePeopleCount: document.getElementById('treePeopleCount'),
+    treeRelCount: document.getElementById('treeRelCount'),
+    treeResetBtn: document.getElementById('treeResetBtn'),
+    indexingHint: document.getElementById('indexingHint'),
+    loadingSkipBtn: document.getElementById('loadingSkipBtn'),
 };
 
 const critical = ['viewport', 'gallery', 'connections', 'status'];

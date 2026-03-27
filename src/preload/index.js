@@ -11,6 +11,11 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'set-index-roots',
   'get-people',
   'rename-person',
+  'get-family-tree',
+  'add-relationship',
+  'remove-relationship',
+  'clear-all-relationships',
+  'get-shared-photos',
   'select-folder',
 ]);
 

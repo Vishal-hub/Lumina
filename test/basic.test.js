@@ -24,10 +24,15 @@ function skipTest(name, reason) {
 }
 
 let hasSqlite = false;
-try { require('better-sqlite3'); hasSqlite = true; } catch (_) {}
+try {
+  const Database = require('better-sqlite3');
+  const testDb = new Database(':memory:');
+  testDb.close();
+  hasSqlite = true;
+} catch (_) { }
 
 let hasElectron = false;
-try { require('electron'); hasElectron = true; } catch (_) {}
+try { require('electron'); hasElectron = true; } catch (_) { }
 
 // ---------------------------------------------------------------------------
 // Module import checks
@@ -50,13 +55,36 @@ test('lib/indexer/constants exports correct values', () => {
   const c = require('../lib/indexer/constants');
   assert.ok(c.SUPPORTED_MEDIA instanceof Set);
   assert.ok(c.SUPPORTED_MEDIA.has('.jpg'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.jpeg'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.png'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.webp'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.gif'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.bmp'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.tiff'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.tif'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.svg'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.heic'));
+  assert.ok(c.SUPPORTED_MEDIA.has('.heif'));
   assert.ok(c.SUPPORTED_MEDIA.has('.mp4'));
   assert.ok(c.VIDEO_EXTENSIONS instanceof Set);
   assert.ok(c.VIDEO_EXTENSIONS.has('.mp4'));
   assert.ok(!c.VIDEO_EXTENSIONS.has('.jpg'));
+  assert.ok(c.HEIC_EXTENSIONS instanceof Set);
+  assert.ok(c.HEIC_EXTENSIONS.has('.heic'));
+  assert.ok(c.HEIC_EXTENSIONS.has('.heif'));
+  assert.ok(!c.HEIC_EXTENSIONS.has('.jpg'));
   assert.strictEqual(c.TWO_HOURS_MS, 7200000);
   assert.strictEqual(typeof c.MAX_CLUSTER_SIZE, 'number');
   assert.strictEqual(typeof c.LOCATION_SPLIT_DISTANCE_KM, 'number');
+});
+
+test('image-converter isHeic identifies HEIC files correctly', () => {
+  const { isHeic } = require('../lib/indexer/image-converter');
+  assert.strictEqual(isHeic('/photos/IMG_001.heic'), true);
+  assert.strictEqual(isHeic('/photos/IMG_001.HEIC'), true);
+  assert.strictEqual(isHeic('/photos/IMG_001.heif'), true);
+  assert.strictEqual(isHeic('/photos/IMG_001.jpg'), false);
+  assert.strictEqual(isHeic('/photos/IMG_001.png'), false);
 });
 
 // ---------------------------------------------------------------------------
@@ -73,7 +101,7 @@ if (hasSqlite) {
     const { createDb } = require('../lib/indexer/db');
     return createDb(TEST_DB_PATH);
   };
-  cleanupDb = () => { try { fs.unlinkSync(TEST_DB_PATH); } catch (_) {} };
+  cleanupDb = () => { try { fs.unlinkSync(TEST_DB_PATH); } catch (_) { } };
 
   test('createDb creates all expected tables', () => {
     const db = createTestDb();
@@ -94,7 +122,7 @@ if (hasSqlite) {
   });
 } else {
   createTestDb = () => null;
-  cleanupDb = () => {};
+  cleanupDb = () => { };
   skipTest('createDb creates all expected tables', 'better-sqlite3 not available');
   skipTest('createDb enables WAL mode', 'better-sqlite3 not available');
 }
@@ -328,5 +356,4 @@ if (hasElectron) {
 // ---------------------------------------------------------------------------
 const total = passed + failed + skipped;
 console.log(`\n${total} tests: ${passed} passed, ${failed} failed, ${skipped} skipped\n`);
-process.exit(failed > 0 ? 1 : 0);
- 
+process.exit(failed > 0 ? 1 : 0); 

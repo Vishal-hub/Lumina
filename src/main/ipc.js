@@ -54,6 +54,7 @@ function registerIpcHandlers({ app, db, refreshManager, getLatestRunStats, setLa
     try {
       console.log('Clearing cache via SQL...');
       const tx = db.transaction(() => {
+        db.prepare('DELETE FROM relationships').run();
         db.prepare('DELETE FROM media_faces').run();
         db.prepare('DELETE FROM people').run();
         db.prepare('DELETE FROM event_items').run();
@@ -70,7 +71,7 @@ function registerIpcHandlers({ app, db, refreshManager, getLatestRunStats, setLa
 
     // Clean on-disk thumbnail and analysis-cache directories
     const userDataPath = app.getPath('userData');
-    for (const dirName of ['thumbnails', 'analysis-cache', 'faces']) {
+    for (const dirName of ['thumbnails', 'analysis-cache', 'faces', 'heic-cache', 'face-thumbnails']) {
       const dir = path.join(userDataPath, dirName);
       try {
         if (fs.existsSync(dir)) {
@@ -113,6 +114,31 @@ function registerIpcHandlers({ app, db, refreshManager, getLatestRunStats, setLa
   ipcMain.handle('rename-person', async (e, data) => {
     const { renamePerson } = require('../../lib/indexer/repository');
     return renamePerson(db, data.id, data.name);
+  });
+
+  ipcMain.handle('get-family-tree', async () => {
+    const { getFamilyTree } = require('../../lib/indexer/repository');
+    return getFamilyTree(db);
+  });
+
+  ipcMain.handle('add-relationship', async (e, data) => {
+    const { addRelationship } = require('../../lib/indexer/repository');
+    return addRelationship(db, data.personAId, data.personBId, data.type);
+  });
+
+  ipcMain.handle('remove-relationship', async (e, data) => {
+    const { removeRelationship } = require('../../lib/indexer/repository');
+    return removeRelationship(db, data.id);
+  });
+
+  ipcMain.handle('clear-all-relationships', async () => {
+    const { clearAllRelationships } = require('../../lib/indexer/repository');
+    return clearAllRelationships(db);
+  });
+
+  ipcMain.handle('get-shared-photos', async (e, data) => {
+    const { getSharedPhotos } = require('../../lib/indexer/repository');
+    return getSharedPhotos(db, data.personAId, data.personBId);
   });
 
   ipcMain.handle('select-folder', async () => {

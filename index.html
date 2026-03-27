@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <title>Memory Gallery</title>
@@ -14,7 +14,28 @@
   <div class="app">
     <!-- Minimalist Sidebar -->
     <nav class="sidebar" role="navigation" aria-label="Main navigation">
-      <div class="brand" aria-hidden="true">MG</div>
+      <div class="brand" title="Memory Gallery" role="img" aria-label="Memory Gallery">
+        <svg width="32" height="32" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="brandGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#a78bfa" />
+              <stop offset="50%" stop-color="#818cf8" />
+              <stop offset="100%" stop-color="#38bdf8" />
+            </linearGradient>
+          </defs>
+          <rect x="3" y="6" width="24" height="20" rx="3.5" stroke="url(#brandGrad)" stroke-width="2.2" fill="none" />
+          <rect x="6.5" y="9.5" width="9" height="7" rx="1.5" fill="url(#brandGrad)" opacity="0.15" />
+          <circle cx="10" cy="12" r="1.4" fill="url(#brandGrad)" opacity="0.6" />
+          <path d="M6.5 15 L9.5 12.5 L12 14.5 L14 12 L15.5 14" stroke="url(#brandGrad)" stroke-width="1.3"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />
+          <rect x="18" y="9.5" width="6" height="3" rx="1" fill="url(#brandGrad)" opacity="0.18" />
+          <rect x="18" y="14" width="6" height="3" rx="1" fill="url(#brandGrad)" opacity="0.12" />
+          <circle cx="29" cy="9" r="5" fill="#0f172a" stroke="url(#brandGrad)" stroke-width="1.8" />
+          <path
+            d="M29 5.5 L29.7 8 L32.2 7.3 L30.2 9 L32.2 10.7 L29.7 10 L29 12.5 L28.3 10 L25.8 10.7 L27.8 9 L25.8 7.3 L28.3 8 Z"
+            fill="url(#brandGrad)" />
+        </svg>
+      </div>
       <div class="nav-item active" id="navTimeline" title="Timeline View" role="button" tabindex="0"
         aria-current="page">
         <i>
@@ -42,6 +63,27 @@
           </svg>
         </i>
         <span>People</span>
+      </div>
+      <div class="nav-item" id="navFamilyTree" title="Family Tree" role="button" tabindex="0">
+        <i>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="4" r="2.5" />
+            <circle cx="6" cy="13" r="2.5" />
+            <circle cx="18" cy="13" r="2.5" />
+            <circle cx="3" cy="21" r="1.5" />
+            <circle cx="9" cy="21" r="1.5" />
+            <circle cx="15" cy="21" r="1.5" />
+            <circle cx="21" cy="21" r="1.5" />
+            <line x1="12" y1="6.5" x2="6" y2="10.5" />
+            <line x1="12" y1="6.5" x2="18" y2="10.5" />
+            <line x1="6" y1="15.5" x2="3" y2="19.5" />
+            <line x1="6" y1="15.5" x2="9" y2="19.5" />
+            <line x1="18" y1="15.5" x2="15" y2="19.5" />
+            <line x1="18" y1="15.5" x2="21" y2="19.5" />
+          </svg>
+        </i>
+        <span>Family Tree</span>
       </div>
       <div class="nav-item" id="navMap" title="Map View" role="button" tabindex="0">
         <i>
@@ -74,14 +116,14 @@
       <!-- Floating Controls Island -->
       <div class="island-top">
         <div class="search-island">
-          <input id="searchInput" type="text" placeholder="Search memories..." />
-          <button id="clearSearchBtn" style="display: none;">✖</button>
+          <input id="searchInput" type="text" placeholder="Search memories..." aria-label="Search memories" />
+          <button id="clearSearchBtn" style="display: none;" aria-label="Clear search">✖</button>
         </div>
 
         <div style="width: 1px; height: 24px; background: var(--surface-border);"></div>
 
         <div class="timeline-wrap" id="timelineWrap" style="min-width: 250px;">
-          <input id="timeline" type="range" min="0" max="100" value="100" />
+          <input id="timeline" type="range" min="0" max="100" value="100" aria-label="Timeline slider" />
           <p id="timeLabel" style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap;"></p>
         </div>
 
@@ -122,6 +164,22 @@
           </div>
         </div>
 
+        <div class="tree-mode-wrap hidden" id="treeModeWrap">
+          <div class="tree-mode-meta" id="treeModeMeta">
+            <span class="tree-people-count" id="treePeopleCount">0 People</span>
+            <span class="people-sep">·</span>
+            <span class="tree-rel-count" id="treeRelCount">0 Links</span>
+          </div>
+          <button class="tree-reset-btn" id="treeResetBtn" title="Reset all relationships">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Reset Tree
+          </button>
+        </div>
+
         <div class="groupBy-wrap">
           <div class="custom-dropdown" id="groupByDropdown">
             <div class="dropdown-trigger" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false"
@@ -160,6 +218,7 @@
 
       <p id="status"></p>
       <p id="debug"></p>
+      <div id="indexingHint" class="indexing-hint hidden"></div>
 
       <div id="main-content">
         <div id="viewport">
@@ -170,7 +229,29 @@
                 <div class="loading-orbit">
                   <div class="loading-ring"></div>
                   <div class="loading-ring loading-ring-2"></div>
-                  <div class="loading-icon">MG</div>
+                  <div class="loading-icon">
+                    <svg width="48" height="48" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <linearGradient id="loadGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stop-color="#a78bfa" />
+                          <stop offset="50%" stop-color="#818cf8" />
+                          <stop offset="100%" stop-color="#38bdf8" />
+                        </linearGradient>
+                      </defs>
+                      <rect x="3" y="6" width="24" height="20" rx="3.5" stroke="url(#loadGrad)" stroke-width="2.2"
+                        fill="none" />
+                      <rect x="6.5" y="9.5" width="9" height="7" rx="1.5" fill="url(#loadGrad)" opacity="0.15" />
+                      <circle cx="10" cy="12" r="1.4" fill="url(#loadGrad)" opacity="0.6" />
+                      <path d="M6.5 15 L9.5 12.5 L12 14.5 L14 12 L15.5 14" stroke="url(#loadGrad)" stroke-width="1.3"
+                        stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />
+                      <rect x="18" y="9.5" width="6" height="3" rx="1" fill="url(#loadGrad)" opacity="0.18" />
+                      <rect x="18" y="14" width="6" height="3" rx="1" fill="url(#loadGrad)" opacity="0.12" />
+                      <circle cx="29" cy="9" r="5" fill="#0f172a" stroke="url(#loadGrad)" stroke-width="1.8" />
+                      <path
+                        d="M29 5.5 L29.7 8 L32.2 7.3 L30.2 9 L32.2 10.7 L29.7 10 L29 12.5 L28.3 10 L25.8 10.7 L27.8 9 L25.8 7.3 L28.3 8 Z"
+                        fill="url(#loadGrad)" />
+                    </svg>
+                  </div>
                 </div>
                 <h2 class="loading-title">Memory Gallery</h2>
                 <p class="loading-subtitle" id="loadingSubtitle">Preparing your memories...</p>
@@ -201,6 +282,7 @@
                 <div class="loading-progress-bar" id="loadingProgressBar"></div>
               </div>
               <p class="loading-detail" id="loadingDetail"></p>
+              <button id="loadingSkipBtn" class="loading-skip-btn hidden">Skip — browse while indexing</button>
               <div class="loading-skeleton-row">
                 <div class="skeleton-node"></div>
                 <div class="skeleton-node"></div>
@@ -210,11 +292,27 @@
               </div>
             </div>
           </div>
-          <button id="floatingRecenterBtn" class="floating-btn hidden">🎯 Recenter</button>
+          <button id="floatingRecenterBtn" class="floating-btn hidden"><svg width="15" height="15" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="2" x2="12" y2="5" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+              <line x1="2" y1="12" x2="5" y2="12" />
+              <line x1="19" y1="12" x2="22" y2="12" />
+            </svg>Recenter</button>
         </div>
         <div id="map-panel" class="hidden">
           <div id="map"></div>
-          <button id="fitMapBtn" class="floating-btn" type="button">🎯 Recenter</button>
+          <button id="fitMapBtn" class="floating-btn" type="button"><svg width="15" height="15" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="2" x2="12" y2="5" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+              <line x1="2" y1="12" x2="5" y2="12" />
+              <line x1="19" y1="12" x2="22" y2="12" />
+            </svg>Recenter</button>
         </div>
       </div>
     </main>
@@ -239,6 +337,7 @@
           <div class="settings-options">
             <label class="toggle-wrap">
               <input type="checkbox" id="includeVideosCheckbox" checked>
+              <span class="toggle-track"><span class="toggle-knob"></span></span>
               <span>Include Videos (MP4/MOV)</span>
             </label>
           </div>
@@ -307,6 +406,55 @@
       </div>
     </div>
   </div>
+  <!-- Relationship Modal -->
+  <div id="relationshipModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Define Relationship</h3>
+        <button id="closeRelModalBtn" class="icon-btn" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="rel-modal-people">
+          <div class="rel-person" id="relPersonA">
+            <img class="rel-person-thumb" src="" alt="" />
+            <span class="rel-person-name"></span>
+          </div>
+          <div class="rel-arrow">
+            <div class="custom-dropdown rel-type-dropdown" id="relTypeDropdown">
+              <div class="dropdown-trigger" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false"
+                aria-label="Relationship type">
+                <span class="dropdown-label">Parent of</span>
+                <i class="dropdown-arrow" aria-hidden="true">▾</i>
+              </div>
+              <div class="dropdown-menu" role="listbox" aria-label="Relationship types">
+                <div class="dropdown-item active" data-value="parent-child" role="option" aria-selected="true">Parent of
+                </div>
+                <div class="dropdown-item" data-value="child-parent" role="option" aria-selected="false">Child of</div>
+                <div class="dropdown-item" data-value="spouse" role="option" aria-selected="false">Spouse of</div>
+                <div class="dropdown-item" data-value="sibling" role="option" aria-selected="false">Sibling of</div>
+              </div>
+            </div>
+          </div>
+          <div class="rel-person" id="relPersonB">
+            <img class="rel-person-thumb" src="" alt="" />
+            <span class="rel-person-name"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelRelBtn" class="accent-btn"
+          style="background: var(--surface-item); margin-right: 0.5rem;">Cancel</button>
+        <button id="saveRelBtn" class="accent-btn">Save Relationship</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="src/renderer/app.js"></script>
 </body>
 

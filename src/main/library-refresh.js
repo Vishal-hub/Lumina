@@ -4,7 +4,7 @@ const path = require('path');
 const { BrowserWindow } = require('electron');
 const { runIndexing } = require('../../lib/indexer');
 const { processMetadataBatches, processPendingVisualJobs, processPendingFaceJobs, processPendingEmbeddingJobs, createStreamingFaceQueue } = require('../../lib/indexer/index-service');
-const { getMediaRoots, walkMediaFiles, getMediaFileRecord } = require('../../lib/indexer/scanner');
+const { getMediaRoots, walkMediaFilesAsync, getMediaFileRecord } = require('../../lib/indexer/scanner');
 const { buildEvents } = require('../../lib/indexer/cluster');
 const { getActiveMediaItems, replaceEvents, deleteMediaItemsByPaths } = require('../../lib/indexer/repository');
 
@@ -490,7 +490,8 @@ function createLibraryRefreshManager({ app, db, setLatestRunStats }) {
     if (refreshInFlight || visualQueueInFlight || faceQueueInFlight || embeddingQueueInFlight) return { changed: false };
 
     const { roots, includeVideos } = getMediaRoots(db, app);
-    const scanned = roots.flatMap((root) => walkMediaFiles(root, { includeVideos }));
+    const scanResults = await Promise.all(roots.map((root) => walkMediaFilesAsync(root, { includeVideos })));
+    const scanned = scanResults.flat();
     const scannedMap = new Map(scanned.map((file) => [file.path, file]));
     const indexedRows = db.prepare(`
       SELECT path, mtime_ms, size

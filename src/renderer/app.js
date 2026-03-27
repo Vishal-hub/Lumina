@@ -6,6 +6,7 @@ import {
   redrawConnections,
   centerOnPositions,
   renderClusters,
+  openCluster,
   updateNavActiveState,
   handleBackNavigation,
 } from './graph.js';
@@ -16,8 +17,10 @@ import {
   updateMapMarkers,
   updateModeToolbar,
   focusClusterFromMap,
+  registerGraphCallbacks,
 } from './map.js';
 import { openPeopleGallery, hidePeopleToolbar, resortPeopleGallery } from './people.js';
+import { openFamilyTree, closeFamilyTree, handleTreeKeydown } from './family-tree.js';
 import { applyFilters, bindSearchListeners } from './search.js';
 import {
   setLoadingSubtitle,
@@ -27,7 +30,6 @@ import {
   markPhaseDone,
   dismissLoading,
   isLoadingVisible,
-  resetLoading,
 } from './loading.js';
 
 let _rafFilterId = 0;
@@ -61,8 +63,41 @@ function _markPipelinePhaseDone(phase) {
   const pipelinePhases = ['ai', 'faces', 'vectors'];
   const started = pipelinePhases.filter(p => _phasesStarted.has(p));
   if (started.length > 0 && started.every(p => _phasesDone.has(p)) && isLoadingVisible()) {
-    dismissLoading();
+    _skipToTimeline();
   }
+}
+
+function showSkipButton() {
+  if (ui.loadingSkipBtn) {
+    ui.loadingSkipBtn.classList.remove('hidden');
+  }
+  if (isLoadingVisible()) {
+    setLoadingSubtitle('Your photos are ready — click Skip to browse while we finish up.');
+  }
+}
+
+async function _skipToTimeline() {
+  if (!state._pendingFirstRender && !isLoadingVisible()) return;
+
+  try {
+    const result = await window.api.invoke('read-images', { groupBy: state.groupBy });
+    if (Array.isArray(result.clusters) && result.clusters.length > 0) {
+      state.allClusters = result.clusters;
+    }
+  } catch (_) {
+    if (state._readyClusters) {
+      state.allClusters = state._readyClusters;
+    }
+  }
+  state._readyClusters = null;
+  state._pendingFirstRender = false;
+
+  if (!state.allClusters || state.allClusters.length === 0) return;
+
+  state.filteredClusters = [...state.allClusters];
+  if (ui.slider) ui.slider.oninput = debouncedApplyFilters;
+  dismissLoading();
+  applyFilters();
 }
 
 let _metadataRefreshTimer = 0;
@@ -223,16 +258,42 @@ function bindIPCListeners() {
     }
   });
 
-  window.api.on('metadata-batch-ready', (_event, data) => {
+  window.api.on('metadata-batch-ready', async (_event, data) => {
+    if (state._pendingFirstRender && isLoadingVisible()) {
+      try {
+        const result = await window.api.invoke('read-images', { groupBy: state.groupBy });
+        if (Array.isArray(result.clusters) && result.clusters.length > 0) {
+          const hasThumbnails = result.clusters.some(c =>
+            c.items && c.items[0] && c.items[0].thumbnailPath
+          );
+          if (hasThumbnails) {
+            state._readyClusters = result.clusters;
+            showSkipButton();
+          }
+        }
+      } catch (_) { }
+    }
     if (data?.eventsCount > 0) {
       debouncedMetadataRefresh();
     }
   });
 
-  window.api.on('metadata-processing-complete', () => {
+  window.api.on('metadata-processing-complete', async () => {
     _phaseProgress.metadata = 100;
     _phasesDone.add('metadata');
     _updateLoadingAggregate();
+    if (state._pendingFirstRender) {
+      try {
+        const check = await window.api.invoke('read-images', { groupBy: state.groupBy });
+        const ready = Array.isArray(check.clusters) && check.clusters.some(c =>
+          c.items && c.items[0] && c.items[0].thumbnailPath
+        );
+        if (ready) {
+          state._readyClusters = check.clusters;
+          showSkipButton();
+        }
+      } catch (_) { }
+    }
     debouncedMetadataRefresh();
     if (ui.status.innerText.startsWith('Processing metadata')) {
       ui.status.innerText = '';
@@ -262,6 +323,7 @@ function bindIPCListeners() {
   });
 
   window.api.on('face-indexing-complete', (_event, data) => {
+    state.indexingComplete.faces = true;
     const seconds = typeof data?.durationMs === 'number' ? (data.durationMs / 1000).toFixed(1) : null;
     ui.status.innerText = seconds ? `Face indexing complete in ${seconds}s` : 'Face indexing complete';
     ui.status.style.opacity = '1';
@@ -305,6 +367,7 @@ function bindIPCListeners() {
   });
 
   window.api.on('visual-indexing-complete', (_event, data) => {
+    state.indexingComplete.visual = true;
     const seconds = typeof data?.durationMs === 'number' ? (data.durationMs / 1000).toFixed(1) : null;
     ui.status.innerText = seconds ? `Analysis complete in ${seconds}s` : 'Analysis complete';
     ui.status.style.opacity = '1';
@@ -348,6 +411,7 @@ function bindIPCListeners() {
   });
 
   window.api.on('semantic-indexing-complete', (_event, data) => {
+    state.indexingComplete.vectors = true;
     const seconds = typeof data?.durationMs === 'number' ? (data.durationMs / 1000).toFixed(1) : null;
     ui.status.innerText = seconds ? `Search indexing complete in ${seconds}s` : 'Search indexing complete';
     ui.status.style.opacity = '1';
@@ -367,6 +431,9 @@ function bindIPCListeners() {
 
   window.api.on('model-load-error', (_event, data) => {
     console.warn('[Models] Load error:', data.message);
+    state.indexingComplete.visual = true;
+    state.indexingComplete.faces = true;
+    state.indexingComplete.vectors = true;
     ui.status.innerText = data.hint || 'AI features are unavailable — check your connection and restart.';
     ui.status.style.opacity = '1';
     if (isLoadingVisible()) {
@@ -391,7 +458,7 @@ async function loadImages() {
     ui.status.style.opacity = '1';
 
     const result = await window.api.invoke('read-images', { groupBy: state.groupBy });
-    state.allClusters = result.clusters;
+    state.allClusters = Array.isArray(result.clusters) ? result.clusters : [];
     const indexDebug = result.indexDebug;
     state.libraryDirty = Boolean(indexDebug?.libraryDirty);
     updateLibraryDirtyUI();
@@ -429,7 +496,7 @@ async function loadImages() {
     }
 
     state.filteredClusters = [...state.allClusters];
-    ui.slider.oninput = debouncedApplyFilters;
+    if (ui.slider) ui.slider.oninput = debouncedApplyFilters;
     applyFilters();
   } catch (error) {
     dismissLoading();
@@ -448,7 +515,7 @@ async function refreshLibrary() {
     ui.status.style.opacity = '1';
 
     const result = await window.api.invoke('refresh-library', { groupBy: state.groupBy });
-    state.allClusters = result.clusters;
+    state.allClusters = Array.isArray(result.clusters) ? result.clusters : [];
     const indexDebug = result.indexDebug;
     state.libraryDirty = Boolean(indexDebug?.libraryDirty);
     updateLibraryDirtyUI();
@@ -468,13 +535,28 @@ async function refreshLibrary() {
       if (isLoadingVisible()) {
         markPhaseDone('scan');
       }
-      dismissLoading();
+
+      const hasThumbnails = state.allClusters.some(c =>
+        c.items && c.items[0] && c.items[0].thumbnailPath
+      );
+
+      if (isLoadingVisible()) {
+        if (hasThumbnails) {
+          state._readyClusters = [...state.allClusters];
+          showSkipButton();
+        } else {
+          setLoadingSubtitle('Generating thumbnails...');
+          setLoadingPhase('metadata');
+        }
+        state._pendingFirstRender = true;
+      } else {
+        state.filteredClusters = [...state.allClusters];
+        if (ui.slider) ui.slider.oninput = debouncedApplyFilters;
+        applyFilters();
+      }
+
       ui.status.innerText = 'Enhancing metadata in the background...';
       ui.status.style.opacity = '1';
-
-      state.filteredClusters = [...state.allClusters];
-      ui.slider.oninput = debouncedApplyFilters;
-      applyFilters();
     }
 
     if (indexDebug) {
@@ -494,8 +576,9 @@ async function refreshLibrary() {
 function setupCustomDropdown(el, onChange) {
   if (!el) return;
   const trigger = el.querySelector('.dropdown-trigger');
-  const labelEl = trigger.querySelector('.dropdown-label');
   const menu = el.querySelector('.dropdown-menu');
+  if (!trigger || !menu) return;
+  const labelEl = trigger.querySelector('.dropdown-label');
   const items = Array.from(el.querySelectorAll('.dropdown-item'));
   let focusedIdx = -1;
 
@@ -531,6 +614,7 @@ function setupCustomDropdown(el, onChange) {
   }
 
   function moveFocus(delta) {
+    if (items.length === 0) return;
     items.forEach(i => i.classList.remove('focused'));
     focusedIdx = (focusedIdx + delta + items.length) % items.length;
     items[focusedIdx].classList.add('focused');
@@ -633,21 +717,24 @@ function bindInteractions() {
     setTransform();
   });
 
-  window.addEventListener('mouseup', () => {
+  function endAllDrags() {
     if (state.draggedNodeId) {
       if (state.nodeDragMoved) state.suppressClickUntil = Date.now() + 180;
       state.draggedNodeId = null;
       state.nodeDragMoved = false;
-      ui.viewport.classList.remove('dragging');
-      return;
     }
     if (state.dragMoved) state.suppressClickUntil = Date.now() + 180;
     state.isDraggingViewport = false;
     ui.viewport.classList.remove('dragging');
-  });
+  }
+
+  window.addEventListener('mouseup', endAllDrags);
+  window.addEventListener('blur', endAllDrags);
 
   // Keyboard shortcuts
   window.addEventListener('keydown', async (e) => {
+    if (handleTreeKeydown(e)) { e.preventDefault(); return; }
+
     if (e.key === 'Backspace') {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
         return;
@@ -738,14 +825,21 @@ function bindInteractions() {
   }
 
   // Clear cache
-  ui.clearCacheActionBtn.addEventListener('click', async () => {
+  if (ui.clearCacheActionBtn) ui.clearCacheActionBtn.addEventListener('click', async () => {
     if (confirm('This will wipe all indexed data (thumbnails, AI tags, face data, search index) and close the app.\n\nYou will need to re-open the app to rebuild your library.\n\nContinue?')) {
       ui.clearCacheActionBtn.disabled = true;
       const iconEl = ui.clearCacheActionBtn.querySelector('.action-btn-icon svg');
       if (iconEl) iconEl.classList.add('spin');
       const textEl = ui.clearCacheActionBtn.querySelector('.action-btn-text strong');
       if (textEl) textEl.textContent = 'Clearing...';
-      await window.api.invoke('clear-cache');
+      try {
+        await window.api.invoke('clear-cache');
+      } catch (err) {
+        console.error('Clear cache failed:', err);
+        ui.clearCacheActionBtn.disabled = false;
+        if (iconEl) iconEl.classList.remove('spin');
+        if (textEl) textEl.textContent = 'Clear Cache';
+      }
     }
   });
 
@@ -763,6 +857,7 @@ function bindInteractions() {
   onActivate(ui.navTimeline, async () => {
     const token = ++state.navigationToken;
     hidePeopleToolbar();
+    closeFamilyTree();
     if (ui.timelineWrap) ui.timelineWrap.classList.remove('hidden');
     resetViewportContext();
     setMapVisibility(false, { skipRender: true });
@@ -775,7 +870,14 @@ function bindInteractions() {
 
   onActivate(ui.navPeople, async () => {
     ++state.navigationToken;
+    closeFamilyTree();
     await openPeopleGallery(switchGroupBy);
+  });
+
+  onActivate(ui.navFamilyTree, async () => {
+    ++state.navigationToken;
+    closeFamilyTree();
+    await openFamilyTree(switchGroupBy);
   });
 
   // Custom dropdowns
@@ -805,6 +907,7 @@ function bindInteractions() {
   onActivate(ui.navMap, async () => {
     const token = ++state.navigationToken;
     hidePeopleToolbar();
+    closeFamilyTree();
     if (ui.timelineWrap) ui.timelineWrap.classList.remove('hidden');
     const willShow = !state.showMap;
     if (willShow) {
@@ -836,20 +939,13 @@ function bindInteractions() {
     };
   }
 
-  if (ui.mapStyleSelect) {
-    ui.mapStyleSelect.value = state.currentMapStyle;
-    ui.mapStyleSelect.onchange = (e) => {
-      setMapStyle(e.target.value);
-    };
-  }
-
   // Settings modal
   onActivate(ui.manageFoldersBtn, async (e) => {
     e.preventDefault();
     e.stopPropagation();
     try {
       const settings = await window.api.invoke('get-index-roots');
-      state.indexRoots = Array.isArray(settings) ? settings : settings.roots;
+      state.indexRoots = Array.isArray(settings) ? settings : (settings?.roots || []);
       ui.includeVideosCheckbox.checked = settings.includeVideos !== false;
       renderRootsList();
       ui.settingsModal.classList.remove('hidden');
@@ -883,9 +979,9 @@ function bindInteractions() {
       const item = document.createElement('div');
       item.className = 'root-item';
       item.innerHTML = `
-        <span>${root}</span>
-        <button class="remove-btn" title="Remove">✕</button>
-      `;
+          <span>${root}</span>
+          <button class="remove-btn" title="Remove">✕</button>
+        `;
       item.querySelector('.remove-btn').onclick = () => {
         state.indexRoots.splice(idx, 1);
         renderRootsList();
@@ -996,7 +1092,7 @@ function bindInteractions() {
   }
 
   // Refresh library button
-  ui.refreshLibraryBtn.addEventListener('click', async () => {
+  if (ui.refreshLibraryBtn) ui.refreshLibraryBtn.addEventListener('click', async () => {
     ui.refreshLibraryBtn.disabled = true;
     const iconEl = ui.refreshLibraryBtn.querySelector('.action-btn-icon svg');
     const textEl = ui.refreshLibraryBtn.querySelector('.action-btn-text strong');
@@ -1029,9 +1125,13 @@ function bindInteractions() {
 // Bootstrap
 // ---------------------------------------------------------------------------
 
+registerGraphCallbacks({ openCluster, renderClusters, updateNavActiveState });
 updateModeToolbar();
 bindUserActivitySignals();
 bindSearchListeners();
 bindIPCListeners();
 bindInteractions();
+if (ui.loadingSkipBtn) {
+  ui.loadingSkipBtn.addEventListener('click', () => _skipToTimeline());
+}
 loadImages();
