@@ -1507,6 +1507,9 @@ button:active {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+#settingsModal .modal-body {
   overflow-y: auto;
   padding-right: 8px;
   flex: 1;
