@@ -1,5 +1,5 @@
 const path = require('path');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const { createDb } = require('../../lib/indexer');
 const { createMainWindow } = require('./window');
 const { registerIpcHandlers } = require('./ipc');
@@ -46,6 +46,7 @@ function startApp() {
   }
 
   app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
     const dbPath = path.join(app.getPath('userData'), 'memory-index.sqlite');
     const db = createDb(dbPath);
     const embeddingWorker = createEmbeddingWorkerClient();

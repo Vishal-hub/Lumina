@@ -8,9 +8,13 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'index.js'),
     },
-    fullscreenable: true,
+    frame: false,
+    titleBarStyle: 'hidden',
+    autoHideMenuBar: true,
     show: false,
   });
+
+  win.removeMenu();
 
   win.loadFile(path.join(__dirname, '..', '..', 'index.html'));
   win.once('ready-to-show', () => {

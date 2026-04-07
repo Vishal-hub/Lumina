@@ -1,7 +1,7 @@
 {
-  "name": "memory-desktop",
+  "name": "lumina-desktop",
   "version": "1.0.0",
-  "description": "AI-powered desktop photo gallery with semantic search, face recognition, and timeline clustering",
+  "description": "Lumina: Your memories, enlightened. An AI-powered gallery for the modern era.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -39,8 +39,8 @@
     "sharp": "^0.34.5"
   },
   "build": {
-    "appId": "com.vishal.memory-gallery",
-    "productName": "Memory Gallery",
+    "appId": "com.vishal.lumina",
+    "productName": "Lumina",
     "copyright": "Copyright © 2026 Vishal",
     "directories": {
       "output": "dist"
@@ -72,7 +72,7 @@
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Memory Gallery"
+      "shortcutName": "Lumina"
     },
     "dmg": {
       "contents": [

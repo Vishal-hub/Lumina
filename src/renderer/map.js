@@ -146,7 +146,7 @@ function initMap() {
             maxZoom: 19,
         }).addTo(state.map);
         setMapStyle(state.currentMapStyle);
-        L.control.zoom({ position: 'topright' }).addTo(state.map);
+        L.control.zoom({ position: 'bottomright' }).addTo(state.map);
 
         const mapContainer = state.map.getContainer();
         mapContainer.addEventListener('wheel', (e) => {

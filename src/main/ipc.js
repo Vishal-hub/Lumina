@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron');
+const { ipcMain, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { runIndexing, getEventsForRenderer, getEventSummaryPage, getClusterItems, getPersonCluster, getIndexStats } = require('../../lib/indexer');
@@ -221,10 +221,33 @@ function registerIpcHandlers({ app, db, refreshManager, getLatestRunStats, setLa
     return { success: true, requiresRestart: true };
   });
 
-    ipcMain.on('user-activity', () => {
+  ipcMain.on('user-activity', () => {
     if (typeof refreshManager.noteUserInteraction === 'function') {
       refreshManager.noteUserInteraction();
     }
+  });
+
+  ipcMain.on('window-minimize', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) win.minimize();
+  });
+
+  ipcMain.on('window-toggle-maximize', () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (win) {
+      if (win.isFullScreen()) {
+        win.setFullScreen(false);
+        win.maximize();
+      } else if (win.isMaximized()) {
+        win.unmaximize();
+      } else {
+        win.maximize();
+      }
+    }
+  });
+
+  ipcMain.on('window-close', () => {
+    app.quit();
   });
 }
 

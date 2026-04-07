@@ -1,7 +1,10 @@
-# Memory Gallery
+# Lumina
 
-**Memory Gallery** is an AI-powered desktop gallery that helps you rediscover your memories. It goes beyond simple folders, using on-device machine learning to organize your photos and videos by people, locations, visual concepts, and family relationships.
-![Memory Graph Timeline](docs/images/timeline.png)
+**Lumina** is an AI-powered desktop gallery that helps you rediscover your memories. It goes beyond simple folders, using on-device machine learning to organize your photos and videos by people, locations, visual concepts, and family relationships.
+
+*Your memories, enlightened.*
+
+![Lumina Timeline](docs/images/timeline.png)
 
 ![License](https://img.shields.io/badge/license-ISC-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
@@ -43,7 +46,7 @@ Click any photo to open a full-screen lightbox with keyboard navigation (arrow k
 - **Map Search**: In Map Mode, press Enter on a search query to fly to a matching location and open its marker popup.
 
 ### Broad Format Support
-Memory Gallery handles a wide range of media formats out of the box:
+Lumina handles a wide range of media formats out of the box:
 - **Images**: JPG, PNG, WEBP, GIF, BMP, TIFF, SVG
 - **Apple HEIC/HEIF**: Automatically converted to JPEG on-the-fly for display and AI analysis, with a persistent cache so conversion only happens once
 - **Video**: MP4, MOV, AVI — with an option to include or exclude video files from the Settings panel
@@ -104,8 +107,8 @@ If AI models fail to download or load (e.g., no internet on first run), the app 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/vishalgaikwad3/memory-gallery.git
-cd memory-gallery
+git clone https://github.com/vishalgaikwad3/lumina.git
+cd lumina
 ```
 
 2. Install dependencies:
@@ -117,7 +120,7 @@ npm install
 3. Rebuild native modules for Electron:
 
 ```bash
-npx @electron/rebuild
+npm run rebuild
 ```
 
 4. Start the application:
@@ -145,8 +148,7 @@ Tests that depend on native SQLite are automatically skipped when running under 
 ---
 
 ## Privacy First
-Memory Gallery is **offline-first**. All AI processing, face recognition, and indexing happen locally on your machine. Your photos and personal data never leave your device. The only network request is optional reverse geocoding of GPS coordinates via OpenStreetMap Nominatim to resolve place names.
+Lumina is **offline-first**. All AI processing, face recognition, and indexing happen locally on your machine. Your photos and personal data never leave your device. The only network request is optional reverse geocoding of GPS coordinates via OpenStreetMap Nominatim to resolve place names.
 
 ## License
 This project is licensed under the ISC License.
- 

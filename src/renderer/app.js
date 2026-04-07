@@ -484,6 +484,40 @@ function bindUserActivitySignals() {
 }
 
 // ---------------------------------------------------------------------------
+// Window Controls
+// ---------------------------------------------------------------------------
+
+function bindWindowControls() {
+  const minimizeBtn = document.getElementById('windowMinimizeBtn');
+  const maximizeBtn = document.getElementById('windowMaximizeBtn');
+  const closeBtn = document.getElementById('windowCloseBtn');
+
+  if (minimizeBtn) {
+    minimizeBtn.addEventListener('click', () => {
+      if (window.api && typeof window.api.send === 'function') {
+        window.api.send('window-minimize');
+      }
+    });
+  }
+
+  if (maximizeBtn) {
+    maximizeBtn.addEventListener('click', () => {
+      if (window.api && typeof window.api.send === 'function') {
+        window.api.send('window-toggle-maximize');
+      }
+    });
+  }
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      if (window.api && typeof window.api.send === 'function') {
+        window.api.send('window-close');
+      }
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Library dirty badge
 // ---------------------------------------------------------------------------
 
@@ -1710,6 +1744,7 @@ function bindInteractions() {
 registerGraphCallbacks({ openCluster, renderClusters, updateNavActiveState });
 updateModeToolbar();
 bindUserActivitySignals();
+bindWindowControls();
 bindSearchListeners();
 bindOptimizedIPCListeners();
 bindInteractions();

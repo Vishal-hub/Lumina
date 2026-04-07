@@ -82,6 +82,28 @@ body {
   transform: scale(1.08);
 }
 
+.brand-name {
+  font-size: 1rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #a78bfa, #818cf8, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  transition: opacity 0.3s 0.1s, width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  margin-left: 0;
+}
+
+.sidebar:hover .brand-name {
+  opacity: 1;
+  width: auto;
+  margin-left: 12px;
+}
+
 .nav-item {
   width: calc(100% - 16px);
   margin: 0 8px;
@@ -203,6 +225,85 @@ body {
   overflow: hidden;
 }
 
+/* Custom Window Controls Island */
+.window-controls-island {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2001;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 4px;
+  background: rgba(15, 15, 22, 0.65);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--surface-border);
+  border-top: none;
+  border-right: none;
+  border-radius: 0 0 0 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-app-region: no-drag;
+}
+
+/* Title Drag Region */
+.title-drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  -webkit-app-region: drag;
+  z-index: 1999;
+}
+
+.window-controls-island:hover {
+  background: rgba(15, 15, 22, 0.85);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.window-controls-island button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.window-controls-island button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  transform: translateY(0); /* Override global transform */
+}
+
+.window-controls-island button svg {
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.window-controls-island button:hover svg {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.window-controls-island .close-btn:hover {
+  background: rgba(239, 68, 68, 0.85);
+  color: white;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
+}
+
+.window-controls-island .close-btn:hover svg {
+  opacity: 1;
+}
+
 /* Floating Islands (Toolbar Replacement) */
 .island-top {
   position: absolute;
@@ -222,6 +323,7 @@ body {
   max-width: 95vw;
   width: auto;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-app-region: no-drag;
 }
 
 .icon-btn:hover {

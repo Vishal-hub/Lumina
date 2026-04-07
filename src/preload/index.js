@@ -49,6 +49,9 @@ const ALLOWED_RECEIVE_CHANNELS = new Set([
 
 const ALLOWED_SEND_CHANNELS = new Set([
   'user-activity',
+  'window-minimize',
+  'window-toggle-maximize',
+  'window-close',
 ]);
 
 const api = {
