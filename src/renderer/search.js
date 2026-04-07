@@ -186,6 +186,7 @@ export function applyFilters(forceRender = false) {
     }).filter(c => c && c.items.length > 0);
 
     if (state.searchQuery) {
+        window.api.log.info(`[Search] Executing query: "${state.searchQuery}"`);
         if (!state.indexingComplete.vectors) {
             showIndexingHint('Still indexing — search results will improve in a moment');
         }

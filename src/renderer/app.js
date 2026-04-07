@@ -554,6 +554,7 @@ async function refreshViewMode() {
 
 async function switchGroupBy(nextGroupBy) {
   if (state.groupBy === nextGroupBy) return;
+  window.api.log.info(`[Tab] Switching group-by to: ${nextGroupBy}`);
   state.groupBy = nextGroupBy;
   state.personFilter = null;
 
@@ -1433,6 +1434,7 @@ function bindInteractions() {
 
   // Navigation tabs
   onActivate(ui.navTimeline, async () => {
+    window.api.log.info('[Nav] Timeline clicked');
     const token = ++state.navigationToken;
     state.searchQuery = '';
     if (ui.searchInput) ui.searchInput.value = '';
@@ -1457,12 +1459,14 @@ function bindInteractions() {
   });
 
   onActivate(ui.navPeople, async () => {
+    window.api.log.info('[Nav] People icon clicked');
     ++state.navigationToken;
     closeFamilyTree();
     await openPeopleGallery(switchGroupBy);
   });
 
   onActivate(ui.navFamilyTree, async () => {
+    window.api.log.info('[Nav] Family Tree icon clicked');
     ++state.navigationToken;
     closeFamilyTree();
     await openFamilyTree(switchGroupBy);
@@ -1493,6 +1497,7 @@ function bindInteractions() {
 
   // Map toggle
   onActivate(ui.navMap, async () => {
+    window.api.log.info('[Nav] Map icon clicked');
     const token = ++state.navigationToken;
     hidePeopleToolbar();
     closeFamilyTree();

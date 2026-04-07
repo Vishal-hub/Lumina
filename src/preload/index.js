@@ -54,7 +54,14 @@ const ALLOWED_SEND_CHANNELS = new Set([
   'window-close',
 ]);
 
+
 const api = {
+  log: {
+    info: (...args) => ipcRenderer.send('__electron-log', { level: 'info', data: args }),
+    error: (...args) => ipcRenderer.send('__electron-log', { level: 'error', data: args }),
+    warn: (...args) => ipcRenderer.send('__electron-log', { level: 'warn', data: args }),
+    debug: (...args) => ipcRenderer.send('__electron-log', { level: 'debug', data: args }),
+  },
   invoke: async (channel, ...args) => {
     if (!ALLOWED_INVOKE_CHANNELS.has(channel)) {
       console.error(`[Preload] Blocked invoke on unknown channel: ${channel}`);

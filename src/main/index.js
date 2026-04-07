@@ -47,11 +47,15 @@ function startApp() {
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
+    const log = require('electron-log');
     const dbPath = path.join(app.getPath('userData'), 'memory-index.sqlite');
+    log.info(`[Database] Initializing at: ${dbPath}`);
     const db = createDb(dbPath);
+    
     const embeddingWorker = createEmbeddingWorkerClient();
     const visionFaceWorker = createVisionFaceWorkerClient();
     const mediaAssetWorker = createMediaAssetWorkerClient();
+    
     const refreshManager = createLibraryRefreshManager({
       app,
       db,
@@ -74,15 +78,19 @@ function startApp() {
     });
 
     createMainWindow();
+    log.info('[UI] Main window created');
+
     setTimeout(async () => {
+      log.info('[Models] Starting warm-up of specialized visual models...');
       try {
         if (typeof visionFaceWorker.warmVisualModels === 'function') {
           await visionFaceWorker.warmVisualModels();
         } else {
           await visionFaceWorker.warmModels();
         }
+        log.info('[Models] Visual/Face models ready');
       } catch (error) {
-        console.error('[Models] Vision warmup failed:', error);
+        log.error('[Models] Vision warmup failed:', error);
         broadcastToAll('model-load-error', {
           message: error.message || 'AI models failed to load',
           hint: 'AI features (tagging, search, face recognition) are unavailable. Check your internet connection and restart the app.',
@@ -90,9 +98,11 @@ function startApp() {
       }
 
       try {
+        log.info('[Models] Warming up semantic embedding model...');
         await embeddingWorker.warmEmbeddingModels();
+        log.info('[Models] Semantic models ready');
       } catch (error) {
-        console.error('[Models] Embedding worker warmup failed:', error);
+        log.error('[Models] Embedding worker warmup failed:', error);
         broadcastToAll('model-load-error', {
           message: error.message || 'Search indexing model failed to load',
           hint: 'Visual search will warm up later. Basic browsing still works.',
@@ -101,9 +111,11 @@ function startApp() {
 
     }, 5000);
     refreshManager.startWatching();
+    log.info('[LibraryRefresh] Started directory watching');
+    
     setTimeout(() => {
       refreshManager.checkForStartupChanges().catch((error) => {
-        console.error('[LibraryRefresh] Startup delta check failed:', error);
+        log.error('[LibraryRefresh] Startup delta check failed:', error);
       });
     }, 1200);
 
